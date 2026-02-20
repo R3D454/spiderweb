@@ -1,0 +1,12 @@
+[submodule "third_party/protobuf"]
+	path = third_party/protobuf
+	url = https://github.com/protocolbuffers/protobuf.git
+[submodule "third_party/libzmq"]
+	path = third_party/libzmq
+	url = https://github.com/zeromq/libzmq.git
+[submodule "third_party/cppzmq"]
+	path = third_party/cppzmq
+	url = https://github.com/zeromq/cppzmq.git
+[submodule "third_party/stduuid"]
+	path = third_party/stduuid
+	url = https://github.com/mariusbancila/stduuid.git

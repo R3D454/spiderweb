@@ -1,0 +1,12 @@
+build/
+generated_proto/
+*.o
+*.so
+*.a
+*.dylib
+*.out
+.cache/
+CMakeCache.txt
+CMakeFiles/
+cmake_install.cmake
+Makefile
