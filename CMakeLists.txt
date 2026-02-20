@@ -1,6 +1,10 @@
 cmake_minimum_required(VERSION 3.16)
 project(spiderweb CXX)
 
+# Export compile_commands.json so language servers (clangd/VS Code) see
+# the build-generated include paths (e.g. build/generated_proto).
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
@@ -70,6 +74,29 @@ else()
 endif()
 
 # ---------------------------------------------------------------------------
+# Catch2 (unit tests)
+# ---------------------------------------------------------------------------
+set(CATCH2_SUBMODULE "${CMAKE_SOURCE_DIR}/third_party/Catch2")
+if(EXISTS "${CATCH2_SUBMODULE}/CMakeLists.txt")
+    add_subdirectory("${CATCH2_SUBMODULE}" "${CMAKE_BINARY_DIR}/catch2_build" EXCLUDE_FROM_ALL)
+    set(HAS_CATCH2 TRUE)
+else()
+    set(HAS_CATCH2 FALSE)
+endif()
+
+# ---------------------------------------------------------------------------
+# loguru (optional logging library)
+# ---------------------------------------------------------------------------
+set(LOGURU_SUBMODULE "${CMAKE_SOURCE_DIR}/third_party/loguru")
+if(EXISTS "${LOGURU_SUBMODULE}/CMakeLists.txt")
+    # loguru provides headers and a small library; prefer submodule when present
+    add_subdirectory("${LOGURU_SUBMODULE}" "${CMAKE_BINARY_DIR}/loguru_build" EXCLUDE_FROM_ALL)
+    set(LOGURU_INCLUDE_DIR "${LOGURU_SUBMODULE}/src")
+else()
+    set(LOGURU_INCLUDE_DIR "")
+endif()
+
+# ---------------------------------------------------------------------------
 # libuuid  (optional – used for UUID generation when uuid/uuid.h is present)
 # ---------------------------------------------------------------------------
 find_library(UUID_LIBRARY NAMES uuid)
@@ -130,6 +157,24 @@ set(SOURCES
 add_executable(spiderweb ${SOURCES})
 add_dependencies(spiderweb generate_protos)
 
+# Enable SSE/MMX intrinsics compile options when building for x86 targets so
+# headers like <mmintrin.h> see the proper builtins. This ensures compile
+# flags are exported to `compile_commands.json` for language servers.
+set(SSE_COMPILE_OPTIONS "")
+if(CMAKE_SYSTEM_PROCESSOR MATCHES "x86_64|AMD64|i686|i386")
+    if(CMAKE_CXX_COMPILER_ID MATCHES "Clang|GNU|AppleClang")
+        # Ensure MMX/SSE builtins are available to headers like <mmintrin.h>.
+        # Add -mmmx as some intrinsics require explicit MMX target support.
+        set(SSE_COMPILE_OPTIONS -mmmx -msse -msse2)
+    elseif(MSVC)
+        set(SSE_COMPILE_OPTIONS /arch:SSE2)
+    endif()
+endif()
+
+if(SSE_COMPILE_OPTIONS)
+    target_compile_options(spiderweb PRIVATE ${SSE_COMPILE_OPTIONS})
+endif()
+
 target_include_directories(spiderweb PRIVATE
     src
     "${GEN_PROTO_DIR}"
@@ -147,4 +192,48 @@ target_link_libraries(spiderweb PRIVATE
     ${ZMQ_LIBRARIES}
     ${UUID_LIBRARIES}
     Threads::Threads
+    loguru::loguru
 )
+
+# ---------------------------------------------------------------------------
+# Unit tests (Catch2)
+# ---------------------------------------------------------------------------
+option(ENABLE_TESTS "Build unit tests" ON)
+if(ENABLE_TESTS)
+    if(NOT HAS_CATCH2)
+        message(FATAL_ERROR "Catch2 not found. Please init submodules or install Catch2.")
+    endif()
+
+    enable_testing()
+
+    file(MAKE_DIRECTORY "${CMAKE_BINARY_DIR}/tests")
+
+    add_executable(unit_tests
+        tests/test_main.cpp
+        ${GENERATED_SRCS}
+    )
+
+    if(SSE_COMPILE_OPTIONS)
+        target_compile_options(unit_tests PRIVATE ${SSE_COMPILE_OPTIONS})
+    endif()
+
+    target_include_directories(unit_tests PRIVATE
+        src
+        "${GEN_PROTO_DIR}"
+        ${PROTOBUF_INCLUDE_DIRS}
+    )
+
+    if(LOGURU_INCLUDE_DIR)
+        add_compile_definitions(LOGURU_WITH_STREAMS SQLITE_THREADSAFE=2)
+        target_include_directories(unit_tests PRIVATE "${LOGURU_INCLUDE_DIR}")
+    endif()
+
+    target_link_libraries(unit_tests PRIVATE
+        Catch2::Catch2WithMain
+        ${PROTOBUF_LIBRARIES}
+        ${ZMQ_LIBRARIES}
+        Threads::Threads
+    )
+
+    add_test(NAME unit_tests COMMAND unit_tests)
+endif()

@@ -3,6 +3,7 @@
 #include <iostream>
 #include <sstream>
 #include <string>
+#include <loguru.hpp>
 
 static void usage(const char* prog) {
     std::cerr << "Usage: " << prog
@@ -27,6 +28,7 @@ int main(int argc, char* argv[]) {
                        payload_mcast, payload_port,
                        ctrl_mcast, ctrl_port);
     node.start();
+    LOG_S(INFO) << "Node '" << node_id << "' started.";
 
     std::cout << "[spiderweb] Node '" << node_id << "' started.\n"
               << "Commands: publish <topic> <text>  |  peers  |  quit\n";

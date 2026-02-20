@@ -115,3 +115,19 @@ The payload is wrapped in `google.protobuf.Any` so subscribers can
 - This is a **proof-of-concept**.  No authentication, encryption, or persistence
   beyond in-process memory is provided.
 - No LICENSE file is included; all rights reserved by the author.
+
+## Editor / Language Server
+
+- If your editor or language server (e.g. `clangd`) reported errors from
+  headers like `<mmintrin.h>`, ensure the build-generated `compile_commands.json`
+  includes the target architecture flags. This project sets SSE options for
+  x86 builds in `CMakeLists.txt` so `-msse -msse2` (or `/arch:SSE2` on MSVC)
+  are exported to the compilation database when you run `cmake`.
+- After regenerating the build files, restart your language server or editor
+  so it picks up the updated `compile_commands.json`.
+
+Common ways to restart `clangd`/C++ language servers in editors:
+
+- VS Code (clangd extension): open Command Palette → `Clangd: Restart`.
+- VS Code (ms-vscode.cpptools): open Command Palette → `C/C++: Restart Language Server`.
+- Or simply close and re-open the workspace/window.
